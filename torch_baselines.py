@@ -1,20 +1,17 @@
 from torch_geometric.nn import GAT, GCN, TransformerConv, DynamicEdgeConv, MLP, Linear
-from torch_geometic.data import Data
+from torch_geometric.data import Data
 from torch_geometric.transforms import KNNGraph
 from torch_geometric.utils import erdos_renyi_graph
+import torch
 
 class MLPRegressor(torch.nn.Module):
     """
         MLPRegressor for tabular data
     """
-    def __init__(self, in_channels,
-                 hidden_channels,
-                 num_layers,
-                 out_channels=1):
+    def __init__(self, channel_list):
 
         super(MLPRegressor, self).__init__()
-        self.mlp = MLP(in_channels=in_channels, hidden_channels=hidden_channels,\
-                       num_layers = num_layers, out_channels= out_channels)
+        self.mlp = MLP(channel_list)
 
     def reset_parameters(self):
         self.mlp.reset_parameters()
@@ -33,7 +30,7 @@ class KnnGNN(torch.nn.Module):
                  num_layers,
                  out_channels=1,
                  model='GCN',
-                 k=3):
+                 k=7):
         super(KnnGNN, self).__init__()
         if model == 'GCN':
             self.gnn = GCN(in_channels=in_channels, hidden_channels=hidden_channels,\
@@ -65,12 +62,16 @@ class GraphTransformer(torch.nn.Module):
                  num_layers,
                  attn_head = 1,
                  out_channels=1,
-                 k=3):
+                 k=7,
+                 device='cpu'):
         super(GraphTransformer, self).__init__()
-        self.transformer = TransformerConv(in_channels=in_channels, out_channels=hidden_channels, heads=attn_head)
+        self.transformer = TransformerConv(in_channels=in_channels, out_channels=hidden_channels,\
+                                           heads=attn_head, concat=False)
         self.gnn = GCN(in_channels=hidden_channels, hidden_channels=hidden_channels,\
                        num_layers = num_layers, out_channels= out_channels)
         self.graph_construction = KNNGraph(k=k)
+        self.device = device
+        self.k = k
 
     def reset_parameters(self):
         self.transformer.reset_parameters()
@@ -78,11 +79,11 @@ class GraphTransformer(torch.nn.Module):
 
     def forward(self, data: Data):
         num_nodes = data.num_nodes
-        edge_index = erdos_renyi_graph(num_nodes, p=1.0, directed=False) #Generate a complete-graph
+        edge_index = erdos_renyi_graph(num_nodes, edge_prob=1.0, directed=False).to(self.device) #Generate a complete-graph
         x = data.x
         h = self.transformer(x, edge_index)
-        attn_data = KNNGraph(Data(x=h)) #Obtain KnnGraph from an attention-based approach
-        x, edge_index = attn_data.x, attn_data.edge_index
+        attn_data = KNNGraph(k=self.k)(Data(x=h, pos=h)) #Obtain KnnGraph from an attention-based approach
+        x, edge_index = attn_data.x.to(self.device), attn_data.edge_index.to(self.device)
         h = self.gnn(x, edge_index)
         return h
 
@@ -94,7 +95,7 @@ class DGCNN(torch.nn.Module):
     def __init__(self, input_channels,
                 hidden_channels,
                 output_channels=1,
-                k=3):
+                k=7):
 
         super(DGCNN, self).__init__()
         self.conv1 = DynamicEdgeConv(MLP([2 * input_channels, hidden_channels]), k)
