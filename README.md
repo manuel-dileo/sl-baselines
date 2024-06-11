@@ -1,4 +1,4 @@
-# Baselines for Structure Learning on Node Regression Task
+# Baselines for Graph Structure Learning on Node Regression Task
 
 Repository for training and evaluating simple baselines over a node regression task using different graph structure learning strategies.
 
