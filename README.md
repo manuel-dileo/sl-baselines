@@ -2,6 +2,8 @@
 
 Repository for training and evaluating simple baselines over a node regression task using different graph structure learning strategies.
 
+Code to reproduce part of the experiments described in "Graph Machine Learning for fast product development from formulation trials", accepted at ECML PKDD 2024.
+
 ## Run on your dataset
 
 To train and evaluate all the baselines on your dataset you can run the following command by terminal:
